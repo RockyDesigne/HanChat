@@ -9,6 +9,7 @@
 #include "Message.h"
 #include "Defer.h"
 #include "channel.h"
+#include "ClientSocket.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN

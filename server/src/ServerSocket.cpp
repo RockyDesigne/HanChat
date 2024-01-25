@@ -2,7 +2,9 @@
 // Created by HORIA on 24.01.2024.
 //
 #include "ServerSocket.h"
+#include "ThreadPool.h"
 #include <iostream>
+#include <chrono>
 
 msd::channel<Message> ServerSocket::messages;
 std::unordered_map<std::string, ClientSocket> ServerSocket::conns;
@@ -11,7 +13,7 @@ bool ServerSocket::m_on = true;
 
 ServerSocket::ServerSocket(int family, int socktype, int protocol, int flags, std::string_view defaultPort,
                            bool blocking) : Socket{family,socktype,protocol,flags,defaultPort}, m_blocking{blocking} {
-    if (!blocking) {
+    if (!m_blocking) {
         u_long mode {1};
         if (ioctlsocket(getSocket(), FIONBIO, &mode) == SOCKET_ERROR) {
             throw Exception {"Error setting server socket to non blocking mode!\n"};
@@ -70,12 +72,14 @@ void ServerSocket::stateCheck() {
 void ServerSocket::run() {
     threads.emplace_back(stateCheck);
     threads.emplace_back(serve);
+    ThreadPool pool {6};
     while (m_on) {
         ClientSocket conn{acceptSocket()};
         if (conn.getSocket() != INVALID_SOCKET) {
             std::cout << "Accepted connection from: " << Socket::stringifyAdress(conn.getAddr()) << '\n';
             messages << Message{MessageType::ClientConnected, conn, "Buna!\n"};
-            threads.emplace_back(client,conn);
+            ThreadPool::Task task {[=](){client(conn);}};
+            pool.enqueue(task);
         }
     }
     messages.close();
@@ -91,6 +95,11 @@ void ServerSocket::client(ClientSocket conn) {
         iRes = recv(conn.getSocket(),buffer,512,0);
         if (iRes > 0) {
             messages << Message {MessageType::NewMessage,conn, std::string {buffer}};
+        } else if (iRes == 0) {
+            messages << Message {MessageType::DeleteClient,conn,std::string {"Client left!\n"}};
+            break;
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     } while (ServerSocket::m_on);
 }

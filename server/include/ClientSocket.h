@@ -12,7 +12,7 @@
 
 class ClientSocket {
 public:
-    ClientSocket(SOCKET socket=INVALID_SOCKET, sockaddr_in addr={});
+    ClientSocket(SOCKET socket=INVALID_SOCKET, sockaddr_in addr={},bool blocking=false);
     //getters
     [[nodiscard]] sockaddr_in getAddr() const;
     SOCKET getSocket() const;
@@ -24,6 +24,7 @@ public:
 private:
     SOCKET m_socket {};
     sockaddr_in m_addr {};
+    bool m_blocking;
 };
 
 #endif //SERVER_CLIENTSOCKET_H
