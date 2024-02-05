@@ -23,15 +23,15 @@ public:
     explicit ServerSocket(int family=AF_INET, int socktype=SOCK_STREAM, int protocol=IPPROTO_TCP, int flags=AI_PASSIVE, std::string_view defaultPort="24806", bool blocking=false);
     //functions
     static void serve();
-    ClientSocket acceptSocket();
+    void acceptSocket(ClientSocket& conn);
     static void stateCheck();
     void run();
 
-    static void client(ClientSocket conn);
+    static void client(std::shared_ptr<ClientSocket> conn);
 private:
     bool m_blocking;
     static msd::channel<Message> messages;
-    static std::unordered_map<std::string, ClientSocket> conns;
+    static std::unordered_map<std::string, std::shared_ptr<ClientSocket>> conns;
     static std::vector<std::thread> threads;
     static bool m_on;
 };

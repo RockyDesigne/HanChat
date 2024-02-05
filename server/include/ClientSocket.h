@@ -12,7 +12,7 @@
 
 class ClientSocket {
 public:
-    ClientSocket(SOCKET socket=INVALID_SOCKET, sockaddr_in addr={},bool blocking=false);
+    explicit ClientSocket(SOCKET socket=INVALID_SOCKET, sockaddr_in addr={},bool blocking=false);
     //getters
     [[nodiscard]] sockaddr_in getAddr() const;
     SOCKET getSocket() const;
