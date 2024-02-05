@@ -7,6 +7,7 @@
 
 #include "ClientSocket.h"
 #include <string>
+#include <memory>
 
 enum class MessageType {
     ClientConnected,
@@ -16,7 +17,7 @@ enum class MessageType {
 
 struct Message {
     MessageType type;
-    ClientSocket conn;
+    std::shared_ptr<ClientSocket> conn{};
     std::string text;
 };
 

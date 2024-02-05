@@ -7,7 +7,7 @@
 #include <chrono>
 
 msd::channel<Message> ServerSocket::messages;
-std::unordered_map<std::string, ClientSocket> ServerSocket::conns;
+std::unordered_map<std::string, std::shared_ptr<ClientSocket>> ServerSocket::conns;
 std::vector<std::thread> ServerSocket::threads;
 bool ServerSocket::m_on = true;
 
@@ -27,17 +27,20 @@ void ServerSocket::serve() {
     while (ServerSocket::m_on) {
         Message msg;
         messages >> msg;
-        std::string ip {Socket::stringifyAdress(msg.conn.getAddr())};
+        if (!msg.conn) {
+            return;
+        }
+        std::string ip {Socket::stringifyAdress(msg.conn->getAddr())};
         switch (msg.type) {
             case MessageType::ClientConnected: {
                 conns[ip]=msg.conn;
-                send(msg.conn.getSocket(),msg.text.c_str(),msg.text.size(),0);
+                send(msg.conn->getSocket(),msg.text.c_str(),msg.text.size(),0);
                 break;
             }
             case MessageType::NewMessage: {
                 std::for_each(conns.begin(),conns.end(),[&msg](auto& pair){
                     if (msg.conn != pair.second) {
-                        send(pair.second.getSocket(), msg.text.c_str(), msg.text.size(), 0);
+                        send(pair.second->getSocket(), msg.text.c_str(), msg.text.size(), 0);
                     }
                 });
                 break;
@@ -50,11 +53,11 @@ void ServerSocket::serve() {
     }
 }
 
-ClientSocket ServerSocket::acceptSocket() {
+void ServerSocket::acceptSocket(ClientSocket& conn) {
     sockaddr_in clientAddr {};
     int clientAddrSize = sizeof(clientAddr);
-    ClientSocket conn {accept(Socket::getSocket(), (sockaddr*)&clientAddr, &clientAddrSize),clientAddr};
-    return conn;
+    conn.setSocket(accept(Socket::getSocket(), (sockaddr*)&clientAddr, &clientAddrSize));
+    conn.setAddr(clientAddr);
 }
 
 void ServerSocket::stateCheck() {
@@ -72,27 +75,27 @@ void ServerSocket::stateCheck() {
 void ServerSocket::run() {
     threads.emplace_back(stateCheck);
     threads.emplace_back(serve);
-    ThreadPool pool {6};
+    ClientSocket conn;
     while (m_on) {
-        ClientSocket conn{acceptSocket()};
+        acceptSocket(conn);
         if (conn.getSocket() != INVALID_SOCKET) {
-            std::cout << "Accepted connection from: " << Socket::stringifyAdress(conn.getAddr()) << '\n';
-            messages << Message{MessageType::ClientConnected, conn, "Buna!\n"};
-            ThreadPool::Task task {[=](){client(conn);}};
-            pool.enqueue(task);
+            auto newConn {std::make_shared<ClientSocket>(conn.getSocket(),conn.getAddr(),false)};
+            std::cout << "Accepted connection from: " << Socket::stringifyAdress(newConn->getAddr()) << '\n';
+            messages << Message{MessageType::ClientConnected, newConn, "Buna!\n"};
+            threads.emplace_back(client,newConn);
         }
     }
     messages.close();
     std::for_each(threads.begin(),threads.end(),[](auto& thr){thr.join();});
 }
 
-void ServerSocket::client(ClientSocket conn) {
+void ServerSocket::client(std::shared_ptr<ClientSocket> conn) {
     char buffer[512];
     int iRes;
-    auto defer {dfr::makeDefer([&conn](){ closesocket(conn.getSocket());})};
+    auto defer {dfr::makeDefer([&conn](){ closesocket(conn->getSocket());})};
     do {
         memset(buffer,'\0',512);
-        iRes = recv(conn.getSocket(),buffer,512,0);
+        iRes = recv(conn->getSocket(),buffer,512,0);
         if (iRes > 0) {
             messages << Message {MessageType::NewMessage,conn, std::string {buffer}};
         } else if (iRes == 0) {

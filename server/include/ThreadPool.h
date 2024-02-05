@@ -28,6 +28,8 @@ public:
 
     void enqueue(Task task);
 
+    void wait();
+
 private:
     std::vector<std::thread> m_threads;
     std::condition_variable m_eventVar;

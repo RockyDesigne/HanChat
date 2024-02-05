@@ -12,6 +12,11 @@ ThreadPool::~ThreadPool() {
     stop();
 }
 
+void ThreadPool::wait() {
+    std::unique_lock<std::mutex> lock(m_eventMutex);
+    m_eventVar.wait(lock,[this](){return m_tasks.empty();});
+}
+
 void ThreadPool::enqueue(ThreadPool::Task task) {
     {
         std::unique_lock<std::mutex> lock(m_eventMutex); // ensures thread safety of the queue
@@ -22,12 +27,12 @@ void ThreadPool::enqueue(ThreadPool::Task task) {
 
 void ThreadPool::start(std::size_t numThreads) {
     for (std::size_t i {}; i < numThreads; ++i) {
-        m_threads.emplace_back([=, this] {
+        m_threads.emplace_back([this] {
             while (true) {
                 Task task;
                 {
                     std::unique_lock<std::mutex> lock {m_eventMutex};
-                    m_eventVar.wait(lock,[=, this]{return (m_stopping || !m_tasks.empty());});
+                    m_eventVar.wait(lock,[this]{return (m_stopping || !m_tasks.empty());});
                     if (m_stopping && m_tasks.empty()) {
                         break;
                     }
