@@ -16,8 +16,8 @@ set(HEADERS
         include/ServerSocket.h
         include/Winsocket.h
         include/ClientSocket.h
-        include/ThreadPool.h)
-set(SOURCES ./src/main.cpp src/ClientSocket.cpp src/ServerSocket.cpp src/Socket.cpp src/Winsocket.cpp src/Winsocket.cpp src/ThreadPool.cpp)
+        )
+set(SOURCES ./src/main.cpp src/ClientSocket.cpp src/ServerSocket.cpp src/Socket.cpp src/Winsocket.cpp src/Winsocket.cpp)
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 target_compile_options(${PROJECT_NAME}
         PRIVATE -Wall -Wextra -pedantic -ggdb -O3 -std=c++20

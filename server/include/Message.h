@@ -17,7 +17,7 @@ enum class MessageType {
 
 struct Message {
     MessageType type;
-    std::shared_ptr<ClientSocket> conn{};
+    int clientId {};
     std::string text;
 };
 
