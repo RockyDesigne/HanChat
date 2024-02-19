@@ -22,11 +22,14 @@
 #include <memory>
 #include <thread>
 #include <cstring>
+#include <string>
 
 #include "GUI.h"
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "24806"
+std::string DEFAULT_PORT  = "24806";
+
+static std::string serverIpAdressAndPort;
 
 static bool on {true};
 char recvbuf[DEFAULT_BUFLEN];
@@ -49,7 +52,6 @@ int main()
     struct addrinfo *result = NULL,
             *ptr = NULL,
             hints;
-    const char *sendbuf = "this is a test";
     int iResult;
     int recvbuflen = DEFAULT_BUFLEN;
 
@@ -65,8 +67,14 @@ int main()
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
+    std::cout << "Input address and port number of the server: \n";
+    std::cin >> serverIpAdressAndPort;
+
+    int pos = serverIpAdressAndPort.find(":");
+    DEFAULT_PORT = serverIpAdressAndPort.substr(pos+1);
+    std::string ipAddress = serverIpAdressAndPort.substr(0,pos);
     // Resolve the server address and port
-    iResult = getaddrinfo("192.168.1.129", DEFAULT_PORT, &hints, &result);
+    iResult = getaddrinfo(ipAddress.c_str(), DEFAULT_PORT.c_str(), &hints, &result);
     if ( iResult != 0 ) {
         printf("getaddrinfo failed with error: %d\n", iResult);
         WSACleanup();
