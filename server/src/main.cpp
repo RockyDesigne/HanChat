@@ -1,6 +1,6 @@
 #include "Winsocket.h"
 #include "ServerSocket.h"
-
+#include "DB.h"
 int main() {
 
     //init Winsocket
@@ -11,5 +11,6 @@ int main() {
     serverSocket.run();
 
     Winsocket::freeInstance();
-    return 0;
+
+     return 0;
 }

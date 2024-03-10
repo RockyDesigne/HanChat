@@ -5,11 +5,13 @@
 #include "ThreadPool.h"
 #include <iostream>
 #include <chrono>
+#include <cstring>
 
 msd::channel<Message> ServerSocket::messages;
 std::unordered_map<std::string, std::shared_ptr<ClientSocket>> ServerSocket::conns;
 std::vector<std::thread> ServerSocket::threads;
 bool ServerSocket::m_on = true;
+int ServerSocket::messageID = 8;
 
 ServerSocket::ServerSocket(int family, int socktype, int protocol, int flags, std::string_view defaultPort,
                            bool blocking) : Socket{family,socktype,protocol,flags,defaultPort}, m_blocking{blocking} {
@@ -21,6 +23,42 @@ ServerSocket::ServerSocket(int family, int socktype, int protocol, int flags, st
     }
     bindSocket();
     listenSocket();
+    m_db = DB::getInstance();
+    DB::connect();
+}
+
+void ServerSocket::sendAllMessages(const std::shared_ptr<ClientSocket> conn) {
+    std::vector<std::string> dbMessages;
+    pullMessages(dbMessages);
+    for (const auto& message : dbMessages) {
+        uint32_t length = htonl(message.size()); // Convert to network byte order (big endian)
+        /*
+        std::string buffer = std::to_string(length); // no bueno this
+        buffer += message;
+        std::cout << buffer;
+         */
+        std::vector<char> buffer(sizeof(length) + message.size());
+        std::memcpy(buffer.data(), &length, sizeof(length));
+        std::memcpy(buffer.data() + sizeof(length), message.c_str(), message.size());
+        uint32_t totalSentBytes = 0;
+        while (totalSentBytes < buffer.size()) {
+            int sentBytes = send(conn->getSocket(), buffer.data() + totalSentBytes, buffer.size() - totalSentBytes, 0);
+            if (sentBytes == -1) {
+                // Handle error
+                throw std::runtime_error("Error sending message");
+            }
+            totalSentBytes += sentBytes;
+        }
+    }
+}
+
+void ServerSocket::pullMessages(std::vector<std::string> &dbMessages) {
+    DB::pullMessages(dbMessages);
+}
+
+void ServerSocket::saveMessage(std::string_view msg) {
+    DB::insertMessage(msg, messageID);
+    ++messageID;
 }
 
 void ServerSocket::serve() {
@@ -34,10 +72,12 @@ void ServerSocket::serve() {
         switch (msg.type) {
             case MessageType::ClientConnected: {
                 conns[ip]=msg.conn;
-                send(msg.conn->getSocket(),msg.text.c_str(),msg.text.size(),0);
+                //send(msg.conn->getSocket(),msg.text.c_str(),msg.text.size(),0);
+                sendAllMessages(msg.conn);
                 break;
             }
             case MessageType::NewMessage: {
+                saveMessage(msg.text);
                 std::for_each(conns.begin(),conns.end(),[&msg](auto& pair){
                     if (msg.conn != pair.second) {
                         send(pair.second->getSocket(), msg.text.c_str(), msg.text.size(), 0);
@@ -46,7 +86,7 @@ void ServerSocket::serve() {
                 break;
             }
             case MessageType::DeleteClient: {
-                conns.erase(ip);
+                //conns.erase(ip);
                 break;
             }
         }
@@ -87,6 +127,7 @@ void ServerSocket::run() {
     }
     messages.close();
     std::for_each(threads.begin(),threads.end(),[](auto& thr){thr.join();});
+    DB::freeInstance();
 }
 
 void ServerSocket::client(std::shared_ptr<ClientSocket> conn) {

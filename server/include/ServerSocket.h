@@ -10,6 +10,7 @@
 #include "Defer.h"
 #include "channel.h"
 #include "ClientSocket.h"
+#include "DB.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -26,6 +27,9 @@ public:
     void acceptSocket(ClientSocket& conn);
     static void stateCheck();
     void run();
+    static void sendAllMessages(const std::shared_ptr<ClientSocket> conn);
+    static void saveMessage(std::string_view msg);
+    static void pullMessages(std::vector<std::string>& dbMessages);
 
     static void client(std::shared_ptr<ClientSocket> conn);
 private:
@@ -34,6 +38,8 @@ private:
     static std::unordered_map<std::string, std::shared_ptr<ClientSocket>> conns;
     static std::vector<std::thread> threads;
     static bool m_on;
+    static int messageID;
+    DB* m_db {};
 };
 
 #endif //SERVER_SERVERSOCKET_H
