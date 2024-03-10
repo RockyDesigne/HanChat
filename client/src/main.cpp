@@ -12,6 +12,8 @@
 #undef far
 #endif
 // TO DO:
+// FIX sending new messages on the server side
+// also server has a bug when exiting, it crashes
 // Fix the way messages resize, they resize badly when in fullscreen, they dont change
 // make it so you dont have to press backspace repetitively to delete a message
 // add a cursor so ypou can switch between characters
@@ -35,11 +37,18 @@ static bool on {true};
 char recvbuf[DEFAULT_BUFLEN];
 void rec(SOCKET& sock, std::list<client::MessageBox>& message_boxes, Rectangle& box) {
     while (on) {
-        int i = recv(sock, recvbuf, DEFAULT_BUFLEN, 0);
-        if (i > 0) {
-            client::MessageBox message_box{box.x + 50, box.y - 50 * (message_boxes.size() + 1), box.width - 50, 50,recvbuf};
-            message_boxes.push_back(message_box);
-            std::memset(recvbuf, '\0', DEFAULT_BUFLEN);
+        uint32_t length;
+        int receivedBytes = recv(sock, (char*)&length, sizeof(length), 0);
+        if (receivedBytes > 0) {
+            length = ntohl(length); // Convert from network byte order
+            char* messageBuf = new char[length + 1];
+            receivedBytes = recv(sock, messageBuf, length, 0);
+            if (receivedBytes > 0) {
+                messageBuf[receivedBytes] = '\0'; // Null-terminate the message
+                client::MessageBox message_box{box.x + 50, box.y - 50 * (message_boxes.size() + 1), box.width - 50, 50, messageBuf};
+                message_boxes.push_back(message_box);
+            }
+            delete[] messageBuf;
         }
     }
 }
